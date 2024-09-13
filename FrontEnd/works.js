@@ -121,7 +121,7 @@ validateButton.disabled = true;
 
 // Vérifier si l'utilisateur est connecté
 const loged = window.sessionStorage.getItem('loged');
-const logout = document.querySelector(".logout");
+const logouttxt = document.querySelector(".logout");
 const containerModals = document.querySelector(".containerModals");
 const faPen = document.querySelector(".fa-pen-to-square");
 const edition = document.getElementById("navEdition");
@@ -130,6 +130,7 @@ const faX = document.querySelector(".fa-x");
 const addPhotoButton = document.querySelector(".modalWorks button"); // Bouton pour ajouter une photo
 const modalForm = document.querySelector(".modal-form");
 const arrowLeft = document.querySelector(".fa-arrow-left");
+const logoutButton = document.querySelector(".logout");
 
 // Fonction pour vider la galerie dans la modal
 function clearModalGallery() {
@@ -190,11 +191,6 @@ function createWorksInModal(work) {
                 if (response.ok) {
                     figure.remove(); // Retirer l'élément de la modal
                     removeFromGallery(work.id); // Retirer l'élément de la galerie principale
-                    alert("Projet supprimé avec succès !");
-                } else if (response.status === 401) {
-                    alert("Non autorisé. Veuillez vérifier vos permissions ou votre token.");
-                } else {
-                    alert("Une erreur s'est produite lors de la suppression du projet.");
                 }
             } catch (error) {
                 console.error("Erreur:", error);
@@ -236,25 +232,32 @@ async function openModalWithForm() {
         categorySelect.appendChild(option);
     });
 
-    // Gérer la soumission du formulaire
+    // Gérer la soumission du formulaire avec prévention de la soumission multiple
     const form = document.querySelector("#addWorkForm");
 
-form.addEventListener("submit", async (event) => {
+    form.addEventListener("submit", async (event) => {
     event.preventDefault();  // Empêcher le rechargement de la page
 
-    // Validation manuelle de l'image
-    if (!photoInput.files.length) {
-        alert("Veuillez sélectionner une image.");
+    // Empêcher la soumission multiple si un projet est déjà en train d'être ajouté
+    if (form.submitting) {
         return;
     }
 
-    const formData = new FormData();
-    formData.append('image', photoInput.files[0]); // Le fichier image sélectionné
-    formData.append('title', titleInput.value); // Le titre du projet
-    formData.append('category', categorySelect.value); // L'ID de la catégorie
-    
-    const token = window.sessionStorage.getItem('token'); // Récupérer le token si nécessaire
+    form.submitting = true; // Marque le formulaire comme en cours de soumission
+
     try {
+        // Validation manuelle de l'image
+        if (!photoInput.files.length) {
+            alert("Veuillez sélectionner une image.");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('image', photoInput.files[0]); // Le fichier image sélectionné
+        formData.append('title', titleInput.value); // Le titre du projet
+        formData.append('category', categorySelect.value); // L'ID de la catégorie
+        
+        const token = window.sessionStorage.getItem('token'); // Récupérer le token si nécessaire
         const response = await fetch("http://localhost:5678/api/works", {
             method: 'POST',
             headers: {
@@ -272,7 +275,7 @@ form.addEventListener("submit", async (event) => {
             // Ajouter le nouveau travail dans la galerie de la modale
             createWorksInModal(newWork); 
 
-            // Optionnel : réinitialiser le formulaire et l'aperçu de l'image après l'ajout
+            // Réinitialiser le formulaire et l'aperçu de l'image après l'ajout
             form.reset();  // Réinitialiser le formulaire
             apercuImg.src = "";  // Réinitialiser l'aperçu de l'image
             apercuImg.style.display = "none";
@@ -284,12 +287,13 @@ form.addEventListener("submit", async (event) => {
             modalForm.style.display = 'none';
             modalWorks.style.display = 'block';
 
-            alert("Projet ajouté avec succès !");
         } else {
             throw new Error('Erreur lors de l\'envoi');
         }
     } catch (error) {
         console.error("Erreur:", error);
+    } finally {
+        form.submitting = false; // Réinitialiser l'état de soumission pour permettre de nouveaux envois
     }
 });
 }
@@ -345,9 +349,10 @@ inputFile.addEventListener("change", () => {
 
 // Vérification de la connexion
 if (loged === "true") {
-    if (logout) {
-        logout.textContent = "logout";
-        logout.href = "./index.html"; // Définir l'attribut href de l'élément <a>
+    if (logouttxt) {
+        logouttxt.textContent = "logout";
+        logoutButton.addEventListener("click", logout);
+        logouttxt.href = "./index.html"; // Définir l'attribut href de l'élément <a>
     }
 
     if (containerModals) {
@@ -366,8 +371,10 @@ if (loged === "true") {
         button.style.display = 'none'; // Masquer les boutons de catégories
     });
 
-    logout.addEventListener("click", () => {
-        window.sessionStorage.setItem('loged', 'false'); // Définir 'loged' à 'false'
-        window.location.href = "./login.html"; // Rediriger vers la page de connexion après déconnexion
-    });
+    function logout() {
+        window.sessionStorage.removeItem('token'); // Supprime le token du sessionStorage
+        authToken = null; 
+        window.sessionStorage.setItem('loged', 'false');
+        window.location.href = "./login.html"; // Rediriger vers la page de connexion
+    }
 }
